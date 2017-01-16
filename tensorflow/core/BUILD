@@ -5,7 +5,7 @@
 # Public targets:
 #
 # ":protos_all" - exports all core TensorFlow protos
-#     ":protos_all_py_pb2" - py_proto_library version (Google-internal)
+#     ":protos_all_py" - py_proto_library version (Google-internal)
 # ":lib" - exports the public non-test headers for:
 #     platform/: Platform-specific code and external dependencies
 #     lib/: Low-level libraries that are not TensorFlow-specific
@@ -84,12 +84,14 @@ load(
     "//tensorflow/core:platform/default/build_config.bzl",
     "tf_proto_library",
     "tf_proto_library_cc",
+    "tf_additional_core_deps",
+    "tf_additional_lib_defines",
+    "tf_additional_lib_deps",
     "tf_additional_lib_hdrs",
     "tf_additional_lib_srcs",
     "tf_additional_minimal_lib_srcs",
     "tf_additional_proto_hdrs",
     "tf_additional_proto_srcs",
-    "tf_additional_lib_deps",
     "tf_additional_stream_executor_srcs",
     "tf_additional_cupti_wrapper_deps",
     "tf_additional_libdevice_data",
@@ -219,6 +221,7 @@ cc_library(
         "lib/hash/crc32c.h",
         "lib/histogram/histogram.h",
         "lib/io/buffered_inputstream.h",
+        "lib/io/compression.h",
         "lib/io/inputstream_interface.h",
         "lib/io/path.h",
         "lib/io/proto_encode_helper.h",
@@ -238,6 +241,7 @@ cc_library(
         "lib/strings/str_util.h",
         "lib/strings/strcat.h",
         "lib/strings/stringprintf.h",
+        "platform/cpu_feature_guard.h",
         "platform/cpu_info.h",
         "platform/dynamic_annotations.h",
         "platform/env.h",
@@ -258,6 +262,7 @@ cc_library(
         "platform/subprocess.h",
         "platform/thread_annotations.h",
         "platform/types.h",
+        "platform/windows/cpu_info.h",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -704,8 +709,7 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
-# Core sources. Should eventually become identical to open source
-# sources.
+# Core sources for Android builds.
 filegroup(
     name = "android_srcs",
     srcs = [
@@ -969,6 +973,14 @@ cc_library(
 )
 
 cc_library(
+    name = "gpu_headers_lib",
+    hdrs = [
+        "common_runtime/gpu/gpu_event_mgr.h",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
     name = "cuda",
     visibility = ["//visibility:public"],
     deps = [
@@ -1111,19 +1123,19 @@ cc_library(
         "platform/demangle.h",
         "platform/denormal.h",
         "platform/host_info.h",
-        "platform/monitoring.h",
         "platform/platform.h",
         "platform/protobuf_internal.h",
         "platform/tensor_coding.h",
         "platform/tracing.h",
     ],
     copts = tf_copts(),
+    defines = tf_additional_lib_defines(),
     linkopts = ["-ldl"],
-    deps = [
+    deps = tf_additional_lib_deps() + [
         ":lib_proto_parsing",
         ":protos_all_cc",
-        "//tensorflow/core/platform/default/build_config:platformlib",
         "//third_party/eigen3",
+        "//tensorflow/core/platform/default/build_config:platformlib",
         "@zlib_archive//:zlib",
     ],
 )
@@ -1343,7 +1355,7 @@ tf_cuda_library(
         ":protos_all_cc",
         "//third_party/eigen3",
         "//tensorflow/core/kernels:required",
-    ] + tf_additional_lib_deps(),
+    ] + tf_additional_core_deps(),
     alwayslink = 1,
 )
 
@@ -1548,8 +1560,8 @@ cc_library(
     alwayslink = 1,
 )
 
-# Low level library tests
 tf_cc_tests(
+    name = "low_level_library_tests",
     size = "small",
     srcs = [
         "lib/core/arena_test.cc",
@@ -1622,7 +1634,8 @@ tf_cc_tests(
     ],
 )
 
-tf_cc_tests(
+tf_cc_test(
+    name = "platform_env_test",
     size = "small",
     srcs = ["platform/env_test.cc"],
     deps = [
@@ -1636,7 +1649,8 @@ tf_cc_tests(
     ],
 )
 
-tf_cc_tests(
+tf_cc_test(
+    name = "platform_file_system_test",
     size = "small",
     srcs = ["platform/file_system_test.cc"],
     deps = [
@@ -1687,8 +1701,8 @@ cc_test(
     ],
 )
 
-# higher level tests
 tf_cc_tests(
+    name = "higher_level_tests",
     size = "small",
     srcs = [
         "common_runtime/device_set_test.cc",
@@ -1784,8 +1798,8 @@ tf_cc_tests(
     ],
 )
 
-# GPU-related tests
 tf_cc_tests_gpu(
+    name = "gpu_related_tests",
     size = "small",
     srcs = glob(["user_ops/**/*_test.cc"]) + [
         "common_runtime/gpu/gpu_bfc_allocator_test.cc",
@@ -2232,6 +2246,7 @@ tf_cc_test(
 )
 
 tf_cc_tests(
+    name = "ops_tests",
     size = "small",
     srcs = [
         "ops/array_ops_test.cc",
